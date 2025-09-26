@@ -1,0 +1,79 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.11, 3.12, 3.13]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        else
+          pip install fastapi uvicorn requests pytest fastapi-mcp
+        fi
+    
+    - name: Run tests with retry
+      id: test
+      run: |
+        # First attempt
+        if pytest tests/ -v --junitxml=test-results.xml; then
+          echo "Tests passed on first attempt"
+          exit 0
+        else
+          echo "Tests failed on first attempt, retrying..."
+          # Second attempt
+          if pytest tests/ -v --junitxml=test-results.xml; then
+            echo "Tests passed on retry"
+            exit 0
+          else
+            echo "Tests failed on retry"
+            exit 1
+          fi
+        fi
+      continue-on-error: true
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.python-version }}
+        path: test-results.xml
+        retention-days: 30
+    
+    - name: Publish test results
+      uses: dorny/test-reporter@v1
+      if: always() && steps.test.outcome == 'failure'
+      with:
+        name: Test Results (Python ${{ matrix.python-version }})
+        path: test-results.xml
+        reporter: java-junit
+        fail-on-error: true
