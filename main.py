@@ -10,7 +10,7 @@ import requests
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("beancount-income-mcp")
 
-FAVA_BASE_URL = os.getenv("FAVA_BASE_URL", "http://127.0.0.1:5000")
+FAVA_BASE_URL = os.getenv("FAVA_BASE_URL", "http://127.0.0.1:5001")
 # usually matches the beancount file "slug" in the URL path
 FAVA_LEDGER_SLUG = os.getenv("FAVA_LEDGER_SLUG", "example-beancount-file")
 
